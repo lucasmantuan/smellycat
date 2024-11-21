@@ -17,11 +17,12 @@
 #define CONVERSION_REG 0x00
 
 // Configuração do Canal A0 e A1 (Modo Single-Shot)
-#define CHANNEL_A0 0xC283
+// #define CHANNEL_A0 0xC283
+#define CHANNEL_A0 0xC483
 #define CHANNEL_A1 0xD283
 
 // Configuração do Ganho A0 e A1
-#define GAIN_A0 4.096
+#define GAIN_A0 2.048
 #define GAIN_A1 4.096
 
 // Arquivos de Calibração dos Sensores
@@ -35,8 +36,8 @@
 #define RL_MQ135 20.0
 #define RL_MQ2 5.0
 
-#define THRESHOLD_MQ135 1.25
-#define THRESHOLD_MQ2 1.2
+#define THRESHOLD_MQ135 1.1
+#define THRESHOLD_MQ2 1.1
 
 int configure_device(int fd, uint16_t config)
 {
@@ -273,7 +274,7 @@ int main()
 
         fflush(log);
         fflush(top);
-        sleep(10);
+        sleep(30);
     }
 
     close(fd);
