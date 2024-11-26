@@ -37,8 +37,8 @@
 #define RL_MQ135 20.0
 #define RL_MQ2 5.0
 
-#define THRESHOLD_MQ135 1.2
-#define THRESHOLD_MQ2 1.2
+// #define THRESHOLD_MQ135 1
+// #define THRESHOLD_MQ2 1
 
 int configure_device(int fd, uint16_t config)
 {
@@ -142,7 +142,7 @@ int save_calibration(const char *filename, float R0)
 int main()
 {
     FILE *log = fopen("/root/smellycat/log.txt", "a");
-    FILE *top = fopen("/var/www/html/top.txt", "a");
+    // FILE *top = fopen("/var/www/html/top.txt", "a");
 
     int fd;
 
@@ -152,17 +152,17 @@ int main()
         return 1;
     }
 
-    if (top == NULL)
-    {
-        perror("top error");
-        return 1;
-    }
+    // if (top == NULL)
+    // {
+    //     perror("top error");
+    //     return 1;
+    // }
 
     if ((fd = open(DEVICE, O_RDWR)) < 0)
     {
         perror("i2c error");
         fclose(log);
-        fclose(top);
+        // fclose(top);
         return 1;
     }
 
@@ -171,7 +171,7 @@ int main()
         perror("device error");
         close(fd);
         fclose(log);
-        fclose(top);
+        // fclose(top);
         return 1;
     }
 
@@ -187,7 +187,7 @@ int main()
             perror("calibrate sensor error");
             close(fd);
             fclose(log);
-            fclose(top);
+            // fclose(top);
             return 1;
         }
         if (save_calibration(CALIBRATION_FILE_MQ135, R0_MQ135) != 0)
@@ -207,7 +207,7 @@ int main()
             perror("calibrate sensor error");
             close(fd);
             fclose(log);
-            fclose(top);
+            // fclose(top);
             return 1;
         }
         if (save_calibration(CALIBRATION_FILE_MQ2, R0_MQ2) != 0)
@@ -230,7 +230,7 @@ int main()
         {
             close(fd);
             fclose(log);
-            fclose(top);
+            // fclose(top);
             return 1;
         }
         usleep(10000);
@@ -250,7 +250,7 @@ int main()
         {
             close(fd);
             fclose(log);
-            fclose(top);
+            // fclose(top);
             return 1;
         }
         usleep(10000);
@@ -268,18 +268,18 @@ int main()
         printf("TIME: %s - MQ135: %.3f - MQ2: %.3f\n", time_str, ratio_a0, ratio_a1);
         fprintf(log, "%s;%.3f;%.3f\n", time_str, ratio_a0, ratio_a1);
 
-        if (ratio_a0 > THRESHOLD_MQ135 || ratio_a1 > THRESHOLD_MQ2)
-        {
-            fprintf(top, "%s;%.3f;%.3f\n", time_str, ratio_a0, ratio_a1);
-        }
+        // if (ratio_a0 > THRESHOLD_MQ135 || ratio_a1 > THRESHOLD_MQ2)
+        // {
+        //     fprintf(top, "%s;%.3f;%.3f\n", time_str, ratio_a0, ratio_a1);
+        // }
 
         fflush(log);
-        fflush(top);
+        // fflush(top);
         sleep(30);
     }
 
     close(fd);
     fclose(log);
-    fclose(top);
+    // fclose(top);
     return 0;
 }
