@@ -17,13 +17,14 @@
 #define CONVERSION_REG 0x00
 
 // Configuração do Canal A0 e A1 (Modo Single-Shot)
-// #define CHANNEL_A0 0xC283
-#define CHANNEL_A0 0xC483
+// #define CHANNEL_A0 0xC283 // 1X
+// #define CHANNEL_A0 0xC483 // 2X
+#define CHANNEL_A0 0xC683 // 4X
 #define CHANNEL_A1 0xD283
 
 // Configuração do Ganho A0 e A1
 #define GAIN_A0 2.048
-#define GAIN_A1 4.096
+#define GAIN_A1 1.024
 
 // Arquivos de Calibração dos Sensores
 #define CALIBRATION_FILE_MQ135 "/root/smellycat/mq135.txt"
@@ -36,8 +37,8 @@
 #define RL_MQ135 20.0
 #define RL_MQ2 5.0
 
-#define THRESHOLD_MQ135 1.1
-#define THRESHOLD_MQ2 1.1
+#define THRESHOLD_MQ135 1.2
+#define THRESHOLD_MQ2 1.2
 
 int configure_device(int fd, uint16_t config)
 {
@@ -141,8 +142,8 @@ int save_calibration(const char *filename, float R0)
 int main()
 {
     FILE *log = fopen("/root/smellycat/log.txt", "a");
-    FILE *top = fopen("/var/www/html/top.txt", "a"); 
-    
+    FILE *top = fopen("/var/www/html/top.txt", "a");
+
     int fd;
 
     if (log == NULL)
