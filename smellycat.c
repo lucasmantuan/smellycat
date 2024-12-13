@@ -17,14 +17,12 @@
 #define CONVERSION_REG 0x00
 
 // Configuração do Canal A0 e A1 (Modo Single-Shot)
-// #define CHANNEL_A0 0xC283 // 1X
-// #define CHANNEL_A0 0xC483 // 2X
-#define CHANNEL_A0 0xC683 // 4X
-#define CHANNEL_A1 0xD283
+#define CHANNEL_A0 0x4303 // 1X
+#define CHANNEL_A1 0x5303 // 1X
 
 // Configuração do Ganho A0 e A1
-#define GAIN_A0 2.048
-#define GAIN_A1 1.024
+#define GAIN_A0 4.096
+#define GAIN_A1 4.096
 
 // Arquivos de Calibração dos Sensores
 #define CALIBRATION_FILE_MQ135 "/root/smellycat/mq135.txt"
@@ -36,9 +34,6 @@
 // Resistência de Carga para o MQ135 e MQ2
 #define RL_MQ135 20.0
 #define RL_MQ2 5.0
-
-// #define THRESHOLD_MQ135 1
-// #define THRESHOLD_MQ2 1
 
 int configure_device(int fd, uint16_t config)
 {
@@ -53,8 +48,30 @@ int configure_device(int fd, uint16_t config)
         return -1;
     }
 
-    usleep(10000);
+    usleep(100000);
     return 0;
+}
+
+uint16_t read_config_register(int fd)
+{
+    uint8_t buffer[1];
+    buffer[0] = CONFIG_REG;
+
+    if (write(fd, buffer, 1) != 1)
+    {
+        perror("error reading from i2c");
+        return 0xFFFF;
+    }
+
+    uint8_t data[2];
+    if (read(fd, data, 2) != 2)
+    {
+        perror("error reading from i2c");
+        return 0xFFFF;
+    }
+
+    uint16_t config_val = (data[0] << 8) | data[1];
+    return config_val;
 }
 
 int16_t read_conversion_register(int fd)
@@ -65,17 +82,39 @@ int16_t read_conversion_register(int fd)
     if (write(fd, buffer, 1) != 1)
     {
         perror("read conversion register error");
-        return -1;
+        return 0xFFFF;
     }
 
     if (read(fd, buffer, 2) != 2)
     {
         perror("read conversion register error");
-        return -1;
+        return 0xFFFF;
     }
 
     int16_t result = (buffer[0] << 8) | buffer[1];
     return result;
+}
+
+int16_t read_conversion_register_with_check(int fd)
+{
+    while (1)
+    {
+        uint16_t config_val = read_config_register(fd);
+
+        if (config_val == 0xFFFF)
+        {
+            return 0xFFFF;
+        }
+
+        if (config_val & 0x8000)
+        {
+            break;
+        }
+
+        usleep(10000);
+    }
+
+    return read_conversion_register(fd);
 }
 
 float calibrate_sensor(int fd, uint16_t channel, float vcc, float RL)
@@ -84,20 +123,23 @@ float calibrate_sensor(int fd, uint16_t channel, float vcc, float RL)
     {
         return -1.0;
     }
-    usleep(10000);
+
+    usleep(100000);
 
     int num_samples = 1000;
     float sum_RS = 0.0;
 
     for (int i = 0; i < num_samples; i++)
     {
-        int16_t raw_value = read_conversion_register(fd);
-        if (raw_value == -1)
+        int16_t raw_value = read_conversion_register_with_check(fd);
+
+        if (raw_value == 0xFFFF)
+        {
             return -1.0;
+        }
 
         float vout = raw_value * vcc / 32768.0;
         float RS = ((vcc - vout) * RL) / vout;
-
         sum_RS += RS;
         usleep(100000);
     }
@@ -116,6 +158,7 @@ float read_calibration(const char *filename)
     }
 
     float R0 = -1.0;
+
     if (fscanf(file, "%f", &R0) != 1)
     {
         fclose(file);
@@ -134,16 +177,33 @@ int save_calibration(const char *filename, float R0)
     {
         return -1;
     }
+
     fprintf(file, "%.6f\n", R0);
     fclose(file);
     return 0;
 }
 
+// ================================================
+void print_binary(uint16_t value)
+{
+    for (int i = 15; i >= 0; i--)
+    {
+        if (value & (1 << i))
+        {
+            printf("1");
+        }
+        else
+        {
+            printf("0");
+        }
+    }
+    printf("\n");
+}
+// ================================================
+
 int main()
 {
     FILE *log = fopen("/root/smellycat/log.txt", "a");
-    // FILE *top = fopen("/var/www/html/top.txt", "a");
-
     int fd;
 
     if (log == NULL)
@@ -152,17 +212,10 @@ int main()
         return 1;
     }
 
-    // if (top == NULL)
-    // {
-    //     perror("top error");
-    //     return 1;
-    // }
-
     if ((fd = open(DEVICE, O_RDWR)) < 0)
     {
         perror("i2c error");
         fclose(log);
-        // fclose(top);
         return 1;
     }
 
@@ -171,7 +224,6 @@ int main()
         perror("device error");
         close(fd);
         fclose(log);
-        // fclose(top);
         return 1;
     }
 
@@ -182,14 +234,15 @@ int main()
     {
         printf("calibrate sensor\n");
         R0_MQ135 = calibrate_sensor(fd, CHANNEL_A0, VCC, RL_MQ135);
+
         if (R0_MQ135 < 0)
         {
             perror("calibrate sensor error");
             close(fd);
             fclose(log);
-            // fclose(top);
             return 1;
         }
+
         if (save_calibration(CALIBRATION_FILE_MQ135, R0_MQ135) != 0)
         {
             perror("calibrate sensor error");
@@ -202,14 +255,15 @@ int main()
     {
         printf("calibrate sensor\n");
         R0_MQ2 = calibrate_sensor(fd, CHANNEL_A1, VCC, RL_MQ2);
+
         if (R0_MQ2 < 0)
         {
             perror("calibrate sensor error");
             close(fd);
             fclose(log);
-            // fclose(top);
             return 1;
         }
+
         if (save_calibration(CALIBRATION_FILE_MQ2, R0_MQ2) != 0)
         {
             perror("calibrate sensor error");
@@ -230,13 +284,13 @@ int main()
         {
             close(fd);
             fclose(log);
-            // fclose(top);
             return 1;
         }
-        usleep(10000);
 
-        int16_t raw_value_a0 = read_conversion_register(fd);
-        if (raw_value_a0 == -1)
+        usleep(100000);
+
+        int16_t raw_value_a0 = read_conversion_register_with_check(fd);
+        if (raw_value_a0 == 0xFFFF)
         {
             break;
         }
@@ -245,18 +299,25 @@ int main()
         float RS_a0 = ((VCC - vout_a0) * RL_MQ135) / vout_a0;
         float ratio_a0 = R0_MQ135 / RS_a0;
 
+        // ================================================
+        uint16_t config_val1 = read_config_register(fd);
+        printf("135\n");
+        print_binary(config_val1);
+        printf("\n");
+        // ================================================
+
         // Configuração e leitura do MQ2
         if (configure_device(fd, CHANNEL_A1) != 0)
         {
             close(fd);
             fclose(log);
-            // fclose(top);
             return 1;
         }
-        usleep(10000);
 
-        int16_t raw_value_a1 = read_conversion_register(fd);
-        if (raw_value_a1 == -1)
+        usleep(100000);
+
+        int16_t raw_value_a1 = read_conversion_register_with_check(fd);
+        if (raw_value_a1 == 0xFFFF)
         {
             break;
         }
@@ -265,21 +326,21 @@ int main()
         float RS_a1 = ((VCC - vout_a1) * RL_MQ2) / vout_a1;
         float ratio_a1 = R0_MQ2 / RS_a1;
 
+        // ================================================
+        uint16_t config_val2 = read_config_register(fd);
+        printf("002\n");
+        print_binary(config_val2);
+        printf("\n");
+        // ================================================
+
         printf("TIME: %s - MQ135: %.3f - MQ2: %.3f\n", time_str, ratio_a0, ratio_a1);
         fprintf(log, "%s;%.3f;%.3f\n", time_str, ratio_a0, ratio_a1);
 
-        // if (ratio_a0 > THRESHOLD_MQ135 || ratio_a1 > THRESHOLD_MQ2)
-        // {
-        //     fprintf(top, "%s;%.3f;%.3f\n", time_str, ratio_a0, ratio_a1);
-        // }
-
         fflush(log);
-        // fflush(top);
         sleep(30);
     }
 
     close(fd);
     fclose(log);
-    // fclose(top);
     return 0;
 }
