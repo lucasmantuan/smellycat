@@ -17,8 +17,8 @@
 #define CONVERSION_REG 0x00
 
 // Configuração do Canal A0 e A1 (Modo Single-Shot)
-#define CHANNEL_A0 0x4303 // 1X
-#define CHANNEL_A1 0x5303 // 1X
+#define CHANNEL_A0 0xC383
+#define CHANNEL_A1 0xD383
 
 // Configuração do Ganho A0 e A1
 #define GAIN_A0 4.096
@@ -95,7 +95,7 @@ int16_t read_conversion_register(int fd)
     return result;
 }
 
-int16_t read_conversion_register_with_check(int fd)
+int16_t read_conversion_register_with_checking(int fd)
 {
     while (1)
     {
@@ -131,7 +131,7 @@ float calibrate_sensor(int fd, uint16_t channel, float vcc, float RL)
 
     for (int i = 0; i < num_samples; i++)
     {
-        int16_t raw_value = read_conversion_register_with_check(fd);
+        int16_t raw_value = read_conversion_register_with_checking(fd);
 
         if (raw_value == 0xFFFF)
         {
@@ -182,24 +182,6 @@ int save_calibration(const char *filename, float R0)
     fclose(file);
     return 0;
 }
-
-// ================================================
-void print_binary(uint16_t value)
-{
-    for (int i = 15; i >= 0; i--)
-    {
-        if (value & (1 << i))
-        {
-            printf("1");
-        }
-        else
-        {
-            printf("0");
-        }
-    }
-    printf("\n");
-}
-// ================================================
 
 int main()
 {
@@ -289,7 +271,7 @@ int main()
 
         usleep(100000);
 
-        int16_t raw_value_a0 = read_conversion_register_with_check(fd);
+        int16_t raw_value_a0 = read_conversion_register_with_checking(fd);
         if (raw_value_a0 == 0xFFFF)
         {
             break;
@@ -298,13 +280,6 @@ int main()
         float vout_a0 = raw_value_a0 * VCC / 32768.0;
         float RS_a0 = ((VCC - vout_a0) * RL_MQ135) / vout_a0;
         float ratio_a0 = R0_MQ135 / RS_a0;
-
-        // ================================================
-        uint16_t config_val1 = read_config_register(fd);
-        printf("135\n");
-        print_binary(config_val1);
-        printf("\n");
-        // ================================================
 
         // Configuração e leitura do MQ2
         if (configure_device(fd, CHANNEL_A1) != 0)
@@ -316,7 +291,7 @@ int main()
 
         usleep(100000);
 
-        int16_t raw_value_a1 = read_conversion_register_with_check(fd);
+        int16_t raw_value_a1 = read_conversion_register_with_checking(fd);
         if (raw_value_a1 == 0xFFFF)
         {
             break;
@@ -325,13 +300,6 @@ int main()
         float vout_a1 = raw_value_a1 * VCC / 32768.0;
         float RS_a1 = ((VCC - vout_a1) * RL_MQ2) / vout_a1;
         float ratio_a1 = R0_MQ2 / RS_a1;
-
-        // ================================================
-        uint16_t config_val2 = read_config_register(fd);
-        printf("002\n");
-        print_binary(config_val2);
-        printf("\n");
-        // ================================================
 
         printf("TIME: %s - MQ135: %.3f - MQ2: %.3f\n", time_str, ratio_a0, ratio_a1);
         fprintf(log, "%s;%.3f;%.3f\n", time_str, ratio_a0, ratio_a1);
