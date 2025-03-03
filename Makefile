@@ -1,13 +1,14 @@
 CC = gcc
-CFLAGS = -Wall
+CFLAGS = -Wall -Igpio
+LDFLAGS = 
 
 TARGET = smellycat
-SRC = smellycat.c
+SRC = smellycat.c gpio/gpio.c
 
 all: $(TARGET)
 
 $(TARGET): $(SRC)
-	$(CC) $(CFLAGS) -o $(TARGET) $(SRC)
+	$(CC) $(CFLAGS) -o $(TARGET) $(SRC) $(LDFLAGS)
 
 clean:
 	rm -f $(TARGET)
